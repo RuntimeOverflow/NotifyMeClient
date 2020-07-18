@@ -5,6 +5,7 @@
 
 @interface Computer : NSObject <GCDAsyncSocketDelegate> {
 	NSMutableArray* queue;
+	NSMutableDictionary* sync;
 	
 	BOOL running;
 	BOOL done;

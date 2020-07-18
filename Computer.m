@@ -21,7 +21,13 @@
 	dict[@"command"] = command;
 	dict[@"parameters"] = parameters;
 	
-	[queue addObject:dict];
+	if(![dict[@"command"] isEqualToString:@"SYNC"]){
+		//Add the message to the queue
+		[queue addObject:dict];
+	} else{
+		//If the message is a sync, store it. This is done to minimize the syncs, which are performed. Because a sync uses a lot of data and it only needs to be done once at the end, I am not adding this to the queue, because if there are 10 notifications at once, there only needs to be one sync instead of 10.
+		sync = dict;
+	}
 	
 	//Process the queue asynchronously
 	dispatch_async([Utilities getProcessingQueue], ^{
@@ -40,6 +46,12 @@
 	GCDAsyncSocket* socket = [self createConnection];
 	
 	BOOL secondAttempt = false;
+	
+	//If we should only sync and there are no other items in the queue, add the sync message to the queue (This is done, to minimize the amount of syncs)
+	if(queue.count == 0 && sync){
+		[queue addObject:sync];
+		sync = NULL;
+	}
 	
 	//Processes items as long as there are items in the queue
 	while(queue.count > 0){
@@ -93,6 +105,12 @@
 		done = false;
 		secondAttempt = false;
 		[queue removeObjectAtIndex:0];
+		
+		//If this was the last message and we should sync, add the sync message to the queue (This is done, to minimize the amount of syncs)
+		if(queue.count == 0 && sync){
+			[queue addObject:sync];
+			sync = NULL;
+		}
 	}
 	
 	//Once everything has been processed, send the close message

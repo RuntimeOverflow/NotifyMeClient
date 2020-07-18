@@ -292,12 +292,12 @@ dispatch_queue_t socketQueue;
 	
 	NSString* msg = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
 	
-	//Adds a computer (which is ready) to the connected hosts
+	NSString* host = @"";
+	uint16_t port = 0;
+	[GCDAsyncUdpSocket getHost:&host port:&port fromAddress:address];
+	
+	//Adds a computer (which is ready) to the connected hosts and syncs all notifications with it
 	if(msg && [msg isEqualToString:@"[NotifyMe] READY"]){
-		NSString* host = @"";
-		uint16_t port = 0;
-		[GCDAsyncUdpSocket getHost:&host port:&port fromAddress:address];
-		
 		if(![self computerForHost:host]){
 			Computer* c = [[Computer alloc] initWithHost:host];
 			[hosts addObject:c];
@@ -305,13 +305,22 @@ dispatch_queue_t socketQueue;
 			//Sending the latest notification if it hasn't expired (expiration after 10 seconds)
 			if(latestNotification && latestNotificationExpiry && [latestNotificationExpiry compare: [NSDate date]] == NSOrderedDescending) [self addNotification:latestNotification host:c];
 			
+			//Synchronize all notifications with the new computer
 			[self syncNotifications:c];
 		}
 	}
 	
-	//Searches computers when a computer searches this device
+	//Synchronizes all notifications, if the computer requests it
+	if(msg && [msg isEqualToString:@"[NotifyMe] RELOAD"]){
+		[self syncNotifications:[self computerForHost:host]];
+	}
+	
+	//Sends a message, when a computer searches for this device
 	if(msg && [msg hasPrefix:@"[NotifyMe] SEARCH DEVICE"] && [[Preferences sharedInstance] isDiscoverable]){
-		[self discoverComputers];
+		NSString* uuidEncoded = [[[UIDevice currentDevice].identifierForVendor.UUIDString dataUsingEncoding:NSUTF8StringEncoding] base64EncodedStringWithOptions:0];
+		NSString* nameEncoded = [[[UIDevice currentDevice].name dataUsingEncoding:NSUTF8StringEncoding] base64EncodedStringWithOptions:0];
+		
+		[udpSocket sendData:[[NSString stringWithFormat:@"[NotifyMe] FOUND %@ %@", uuidEncoded, nameEncoded] dataUsingEncoding:NSUTF8StringEncoding] toHost:host port:[[Preferences sharedInstance] getPort] withTimeout:-1 tag:0];
 	}
 }
 

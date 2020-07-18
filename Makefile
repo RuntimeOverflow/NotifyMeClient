@@ -1,7 +1,6 @@
 INSTALL_TARGET_PROCESSES = SpringBoard
-THEOS_DEVICE_IP=192.168.1.92
+THEOS_DEVICE_IP=192.168.63.58
 
-SYSROOT=$(THEOS)/sdks/iPhoneOS13.3.sdk
 TARGET = iphone:clang:13.4:10.0
 ARCHS = armv7 armv7s arm64 arm64e
 

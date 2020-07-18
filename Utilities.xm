@@ -13,23 +13,28 @@
 @interface SpringBoard : UIApplication{
 	DNDNotificationsService* _dndNotificationsService;
 }
+
 @property int ringerSwitchState;
 @end
 
 @implementation Utilities
 static dispatch_queue_t processingQueue;
 
+//Simple method for getting the ringer state
 +(BOOL)isRingerMuted{
 	return !(BOOL)((SpringBoard*)[UIApplication sharedApplication]).ringerSwitchState;
 }
 
+//Simple method for finding out, if DND is enabled
 +(BOOL)isDndEnabled{
 	DNDNotificationsService* service = MSHookIvar<DNDNotificationsService*>(((SpringBoard*)[UIApplication sharedApplication]), "_dndNotificationsService");
 	
 	return [((DNDState*)[service valueForKey:@"_currentState"]) isActive];
 }
 
+//Returns the queue, which is used to send messages asynchronously
 +(dispatch_queue_t)getProcessingQueue{
+	//If the queue does not exist yet, create a new one with default priority
 	if(!processingQueue){
 		processingQueue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
 	}
