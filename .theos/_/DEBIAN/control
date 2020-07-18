@@ -1,0 +1,10 @@
+Package: com.runtimeoverflow.notifyme
+Name: NotifyMe
+Depends: mobilesubstrate
+Architecture: iphoneos-arm
+Description: Synchronize your notifications with your computer.
+Maintainer: RuntimeOverflow
+Author: RuntimeOverflow
+Section: Tweaks
+Version: 0.0.1-59+debug
+Installed-Size: 2396
