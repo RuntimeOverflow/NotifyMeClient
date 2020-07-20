@@ -5,9 +5,11 @@
 #import <UserNotificationsUIKit/NCNotificationMasterList.h>
 #import <UserNotificationsUIKit/NCNotificationStructuredSectionList.h>
 #import <UserNotificationsUIKit/NCNotificationGroupList.h>
+#import <UserNotificationsUIKit/NCBulletinActionRunner.h>
 #import <UserNotifications/UserNotifications.h>
 #import <UserNotificationsKit/NCNotificationRequest.h>
 #import <UserNotificationsKit/NCNotificationContent.h>
+#import <UserNotificationsKit/NCNotificationAction.h>
 
 @implementation NotificationSynchronizer
 @synthesize udpSocket;
@@ -56,7 +58,7 @@ dispatch_queue_t socketQueue;
 	
 	if(![[Preferences sharedInstance] isEnabled]) return;
 	
-	[self send:@"SYNC" withParameters:[Utilities encrypt:[self jsonFromMasterList:self.list] withKey:[[Preferences sharedInstance] getKey]]];
+	[self send:@"SYNC" withParameters:[Utilities encrypt:[NotificationSynchronizer jsonFromMasterList:self.list] withKey:[[Preferences sharedInstance] getKey]]];
 	
 	//Search for new computers
 	[self discoverComputers];
@@ -68,11 +70,16 @@ dispatch_queue_t socketQueue;
 	
 	if(![[Preferences sharedInstance] isEnabled]) return;
 	
-	[self send:@"SYNC" withParameters:[Utilities encrypt:[self jsonFromMasterList:self.list] withKey:[[Preferences sharedInstance] getKey]] toHost:host];
+	[self send:@"SYNC" withParameters:[Utilities encrypt:[NotificationSynchronizer jsonFromMasterList:self.list] withKey:[[Preferences sharedInstance] getKey]] toHost:host];
 }
 
 //Creates a json of the new notification and sends it to all hosts
 -(void)addNotification:(NCNotificationRequest*)request{
+	if([request.sectionIdentifier isEqualToString:@"com.RuntimeOverflow.Runner"]){
+		NCNotificationAction* clearAction = request.clearAction;
+		[clearAction.actionRunner executeAction:clearAction fromOrigin:NULL endpoint:NULL withParameters:[[NSMutableDictionary alloc] init] completion:NULL];
+	}
+	
 	[[Preferences sharedInstance] loadSettings];
 	
 	if(![[Preferences sharedInstance] isEnabled]) return;
@@ -100,7 +107,7 @@ dispatch_queue_t socketQueue;
 	latestNotificationExpiry = [NSDate dateWithTimeIntervalSinceNow:10.0];
 	
 	NSError* error = nil;
-	NSData* jsonData = [NSJSONSerialization dataWithJSONObject:[self notificationAsDictionary:request] options:0 error:&error];
+	NSData* jsonData = [NSJSONSerialization dataWithJSONObject:[NotificationSynchronizer notificationAsDictionary:request] options:0 error:&error];
 	if(!jsonData || error){
 		[Utilities logError:[NSString stringWithFormat:@"%@", error]];
 		return;
@@ -141,7 +148,7 @@ dispatch_queue_t socketQueue;
 	latestNotificationExpiry = [NSDate dateWithTimeIntervalSinceNow:10.0];
 	
 	NSError* error = nil;
-	NSData* jsonData = [NSJSONSerialization dataWithJSONObject:[self notificationAsDictionary:request] options:0 error:&error];
+	NSData* jsonData = [NSJSONSerialization dataWithJSONObject:[NotificationSynchronizer notificationAsDictionary:request] options:0 error:&error];
 	if(!jsonData || error){
 		[Utilities logError:[NSString stringWithFormat:@"%@", error]];
 		return;
@@ -154,7 +161,7 @@ dispatch_queue_t socketQueue;
 }
 
 //Creates a json string from all notifications
--(NSString*)jsonFromMasterList: (NCNotificationMasterList*)masterList{
++(NSString*)jsonFromMasterList: (NCNotificationMasterList*)masterList{
 	//Puts new notifications together with older notifications
 	NSMutableArray* allGroups = [[NSMutableArray alloc] init];
 	for(NCNotificationStructuredSectionList* sectionList in masterList.notificationSections) [allGroups addObjectsFromArray:sectionList.notificationGroups];
@@ -182,7 +189,7 @@ dispatch_queue_t socketQueue;
 		}
 		
 		for(NCNotificationRequest* request in requests){
-			NSMutableDictionary* notification = [self notificationAsDictionary:request];
+			NSMutableDictionary* notification = [NotificationSynchronizer notificationAsDictionary:request];
 			
 			[group addObject:notification];
 		}
@@ -200,7 +207,7 @@ dispatch_queue_t socketQueue;
 }
 
 //Puts all important information of an NCNotificationRequest in a dictionary (All icons first get base64 encoded to be saved as a string)
--(NSMutableDictionary*)notificationAsDictionary: (NCNotificationRequest*)request{
++(NSMutableDictionary*)notificationAsDictionary: (NCNotificationRequest*)request{
 	NSMutableDictionary* notification = [[NSMutableDictionary alloc] init];
 	
 	notification[@"title"] = request.content.title;
@@ -215,7 +222,27 @@ dispatch_queue_t socketQueue;
 	notification[@"icon"] = [UIImagePNGRepresentation(request.content.icon) base64EncodedStringWithOptions:0];
 	notification[@"attachment"] = request.content.attachmentImage ? [UIImagePNGRepresentation(request.content.attachmentImage) base64EncodedStringWithOptions:0] : NULL;
 	
+	notification[@"dismissAction"] = [NotificationSynchronizer actionAsDictionary:request.closeAction];
+	
+	NSMutableArray* actions = [[NSMutableArray alloc] init];
+	for(NCNotificationAction* action in request.supplementaryActions[@"NCNotificationActionEnvironmentDefault"]){
+		[actions addObject:[NotificationSynchronizer actionAsDictionary:action]];
+	}
+	
+	notification[@"actions"] = actions;
+	
 	return notification;
+}
+
+//Puts all important information of an NCNotificationRequest in a dictionary (All icons first get base64 encoded to be saved as a string)
++(NSMutableDictionary*)actionAsDictionary: (NCNotificationAction*)action{
+	NSMutableDictionary* dict = [[NSMutableDictionary alloc] init];
+	
+	dict[@"id"] = action.identifier;
+	dict[@"text"] = [NSNumber numberWithBool:(BOOL)action.behavior];;
+	dict[@"title"] = action.title;
+	
+	return dict;
 }
 
 //Search for computers by broadcasting a message using UDP
