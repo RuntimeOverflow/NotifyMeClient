@@ -45,7 +45,7 @@ dispatch_queue_t socketQueue;
 	
 	//Connects the udp socket to the broadcast ip
 	NSError *error = nil;
-	if(![self.udpSocket bindToPort:[[Preferences sharedInstance] getPort] error:&error] || ![self.udpSocket enableBroadcast:YES error:&error] || ![self.udpSocket beginReceiving:&error]) {
+	if(![self.udpSocket bindToPort:[[Preferences sharedInstance] getPort] error:&error] || ![self.udpSocket joinMulticastGroup:@"239.16.13.37" error:&error] || ![self.udpSocket beginReceiving:&error]) {
 		[Utilities logError:[NSString stringWithFormat:@"%@", error]];
 		
 		[self.udpSocket close];
@@ -250,7 +250,7 @@ dispatch_queue_t socketQueue;
 	NSString* uuidEncoded = [[[UIDevice currentDevice].identifierForVendor.UUIDString dataUsingEncoding:NSUTF8StringEncoding] base64EncodedStringWithOptions:0];
 	NSString* nameEncoded = [[[UIDevice currentDevice].name dataUsingEncoding:NSUTF8StringEncoding] base64EncodedStringWithOptions:0];
 	
-	if([Utilities calculateBroadcastAddress]) [udpSocket sendData:[[NSString stringWithFormat:@"[NotifyMe] SEARCH COMPUTER %@ %@", uuidEncoded, nameEncoded] dataUsingEncoding:NSUTF8StringEncoding] toHost:[Utilities calculateBroadcastAddress] port:[[Preferences sharedInstance] getPort] withTimeout:-1 tag:0];
+	[udpSocket sendData:[[NSString stringWithFormat:@"[NotifyMe] SEARCH COMPUTER %@ %@", uuidEncoded, nameEncoded] dataUsingEncoding:NSUTF8StringEncoding] toHost:@"239.32.13.37" port:[[Preferences sharedInstance] getPort] withTimeout:-1 tag:0];
 }
 
 //Same as function below
@@ -293,7 +293,7 @@ dispatch_queue_t socketQueue;
 	
 	//Connects the udp socket to the broadcast ip
 	NSError *error = nil;
-	if(![self.udpSocket bindToPort:[[Preferences sharedInstance] getPort] error:&error] || ![self.udpSocket enableBroadcast:YES error:&error] || ![self.udpSocket beginReceiving:&error]) {
+	if(![self.udpSocket bindToPort:[[Preferences sharedInstance] getPort] error:&error] || ![self.udpSocket joinMulticastGroup:@"239.16.13.37" error:&error] || ![self.udpSocket beginReceiving:&error]) {
 		[Utilities logError:[NSString stringWithFormat:@"%@", error]];
 		
 		[self.udpSocket close];
@@ -315,6 +315,7 @@ dispatch_queue_t socketQueue;
 
 //Processes all data received by the UDP socket
 -(void)udpSocket:(GCDAsyncUdpSocket*)sock didReceiveData:(NSData*)data fromAddress:(NSData*)address withFilterContext:(id)filterContext {
+	[Utilities logError:@"Received a message"];
 	if(![[Preferences sharedInstance] isEnabled]) return;
 	
 	NSString* msg = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
